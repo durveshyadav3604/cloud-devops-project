@@ -3,73 +3,71 @@ pipeline {
 
     parameters {
         choice(
-            name: 'TF_ACTION',
+            name: 'ACTION',
             choices: ['apply', 'destroy'],
-            description: 'Select Terraform action'
+            description: 'Choose Terraform action'
         )
     }
 
-    environment {
-        AWS_DEFAULT_REGION = "ap-south-1"
-        TF_DIR = "terraformProject/main"
-    }
 
     stages {
 
         stage('Checkout Code') {
             steps {
                 git branch: 'main',
-                    credentialsId: 'github-token',
-                    url: 'https://github.com/durveshyadav3604/cloud-devops-project.git'
+                    url: 'https://github.com/durveshyadav3604/terraform-pipeline.git',
+                    credentialsId: 'github-token'
             }
         }
 
         stage('Terraform Init') {
             steps {
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: 'aws-terraform-creds']
-                ]) {
-                    sh """
-                        cd ${TF_DIR}
-                        terraform init
-                    """
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-terraform-creds'
+                ]]) {
+                    dir('dev') {
+                        sh '''
+                            rm -rf .terraform
+                            terraform init
+                        '''
+                    }
                 }
             }
         }
 
         stage('Terraform Plan') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
             steps {
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: 'aws-terraform-creds']
-                ]) {
-                    sh """
-                        cd ${TF_DIR}
-                        terraform plan
-                    """
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-terraform-creds'
+                ]]) {
+                    dir('dev') {
+                        sh 'terraform plan -out=tfplan'
+                    }
                 }
             }
         }
 
-        stage('Terraform Apply / Destroy') {
+        stage('Terraform Apply or Destroy') {
             steps {
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: 'aws-terraform-creds']
-                ]) {
-                    script {
-                        if (params.TF_ACTION == 'apply') {
-                            sh """
-                                cd ${TF_DIR}
-                                terraform apply -auto-approve
-                            """
-                        } else if (params.TF_ACTION == 'destroy') {
-                            sh """
-                                cd ${TF_DIR}
+                input message: "Are you sure you want to ${params.ACTION} Terraform resources?"
+
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-terraform-creds'
+                ]]) {
+                    dir('dev') {
+                        sh '''
+                            if [ "${ACTION}" = "apply" ]; then
+                                terraform apply -auto-approve tfplan
+                            else
                                 terraform destroy -auto-approve
-                            """
-                        }
+                            fi
+                        '''
                     }
                 }
             }
@@ -78,10 +76,10 @@ pipeline {
 
     post {
         success {
-            echo "Terraform ${params.TF_ACTION} completed successfully ✅"
+            echo "Terraform ${params.ACTION} completed successfully"
         }
         failure {
-            echo "Terraform ${params.TF_ACTION} failed ❌"
+            echo "Terraform ${params.ACTION} failed"
         }
     }
 }
