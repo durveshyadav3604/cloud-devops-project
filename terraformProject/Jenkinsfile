@@ -1,0 +1,87 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'TF_ACTION',
+            choices: ['apply', 'destroy'],
+            description: 'Select Terraform action'
+        )
+    }
+
+    environment {
+        AWS_DEFAULT_REGION = "ap-south-1"
+        TF_DIR = "terraformProject/main"
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main',
+                    credentialsId: 'github-token',
+                    url: 'https://github.com/durveshyadav3604/cloud-devops-project.git'
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws-terraform-creds']
+                ]) {
+                    sh """
+                        cd ${TF_DIR}
+                        terraform init
+                    """
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws-terraform-creds']
+                ]) {
+                    sh """
+                        cd ${TF_DIR}
+                        terraform plan
+                    """
+                }
+            }
+        }
+
+        stage('Terraform Apply / Destroy') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws-terraform-creds']
+                ]) {
+                    script {
+                        if (params.TF_ACTION == 'apply') {
+                            sh """
+                                cd ${TF_DIR}
+                                terraform apply -auto-approve
+                            """
+                        } else if (params.TF_ACTION == 'destroy') {
+                            sh """
+                                cd ${TF_DIR}
+                                terraform destroy -auto-approve
+                            """
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Terraform ${params.TF_ACTION} completed successfully ✅"
+        }
+        failure {
+            echo "Terraform ${params.TF_ACTION} failed ❌"
+        }
+    }
+}
