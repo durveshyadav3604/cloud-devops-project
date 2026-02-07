@@ -5,18 +5,12 @@ pipeline {
         choice(
             name: 'ACTION',
             choices: ['apply', 'destroy'],
-            description: 'Terraform action to perform'
+            description: 'Terraform action'
         )
     }
 
     environment {
         AWS_DEFAULT_REGION = "ap-south-1"
-
-        // VERY IMPORTANT for CI/CD
-        AWS_SDK_LOAD_CONFIG = "0"
-        AWS_PROFILE = ""
-
-        // Terraform root directory
         TF_DIR = "terraformProject/main"
     }
 
@@ -32,16 +26,14 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'aws-terraform-creds'
-                    ]
-                ]) {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-terraform-creds'
+                ]]) {
                     dir("${TF_DIR}") {
                         sh '''
-                            terraform version
-                            terraform init -reconfigure
+                          rm -rf .terraform
+                          terraform init -reconfigure
                         '''
                     }
                 }
@@ -53,38 +45,32 @@ pipeline {
                 expression { params.ACTION == 'apply' }
             }
             steps {
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'aws-terraform-creds'
-                    ]
-                ]) {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-terraform-creds'
+                ]]) {
                     dir("${TF_DIR}") {
-                        sh '''
-                            terraform plan -out=tfplan
-                        '''
+                        sh 'terraform plan -out=tfplan'
                     }
                 }
             }
         }
 
-        stage('Terraform Apply or Destroy') {
+        stage('Terraform Apply / Destroy') {
             steps {
-                input message: "Are you sure you want to ${params.ACTION} Terraform resources?"
+                input message: "Confirm Terraform ${params.ACTION}?"
 
-                withCredentials([
-                    [
-                        $class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: 'aws-terraform-creds'
-                    ]
-                ]) {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-terraform-creds'
+                ]]) {
                     dir("${TF_DIR}") {
                         sh '''
-                            if [ "${ACTION}" = "apply" ]; then
-                                terraform apply -auto-approve tfplan
-                            else
-                                terraform destroy -auto-approve
-                            fi
+                          if [ "${ACTION}" = "apply" ]; then
+                              terraform apply -auto-approve tfplan
+                          else
+                              terraform destroy -auto-approve
+                          fi
                         '''
                     }
                 }
@@ -94,10 +80,10 @@ pipeline {
 
     post {
         success {
-            echo "Terraform ${params.ACTION} completed successfully "
+            echo "Terraform ${params.ACTION} completed successfully"
         }
         failure {
-            echo "Terraform ${params.ACTION} failed "
+            echo "Terraform ${params.ACTION} failed"
         }
     }
 }
