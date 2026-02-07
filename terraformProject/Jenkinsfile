@@ -26,12 +26,20 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-terraform-creds'
-                ]]) {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-terraform-creds'
+                    ]
+                ]) {
                     dir("${TF_DIR}") {
-                        sh 'terraform init -reconfigure'
+                        sh '''
+                          export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                          export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                          export AWS_DEFAULT_REGION=ap-south-1
+
+                          terraform init -reconfigure
+                        '''
                     }
                 }
             }
@@ -42,12 +50,20 @@ pipeline {
                 expression { params.ACTION == 'apply' }
             }
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-terraform-creds'
-                ]]) {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-terraform-creds'
+                    ]
+                ]) {
                     dir("${TF_DIR}") {
-                        sh 'terraform plan -out=tfplan'
+                        sh '''
+                          export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                          export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                          export AWS_DEFAULT_REGION=ap-south-1
+
+                          terraform plan -out=tfplan
+                        '''
                     }
                 }
             }
@@ -57,17 +73,23 @@ pipeline {
             steps {
                 input message: "Are you sure you want to ${params.ACTION} Terraform resources?"
 
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-terraform-creds'
-                ]]) {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-terraform-creds'
+                    ]
+                ]) {
                     dir("${TF_DIR}") {
                         sh '''
-                        if [ "${ACTION}" = "apply" ]; then
-                            terraform apply -auto-approve tfplan
-                        else
-                            terraform destroy -auto-approve
-                        fi
+                          export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                          export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                          export AWS_DEFAULT_REGION=ap-south-1
+
+                          if [ "${ACTION}" = "apply" ]; then
+                              terraform apply -auto-approve tfplan
+                          else
+                              terraform destroy -auto-approve
+                          fi
                         '''
                     }
                 }
@@ -77,10 +99,10 @@ pipeline {
 
     post {
         success {
-            echo "Terraform ${params.ACTION} completed successfully"
+            echo " Terraform ${params.ACTION} completed successfully"
         }
         failure {
-            echo "Terraform ${params.ACTION} failed"
+            echo " Terraform ${params.ACTION} failed"
         }
     }
 }
