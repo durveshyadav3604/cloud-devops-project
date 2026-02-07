@@ -9,6 +9,10 @@ pipeline {
         )
     }
 
+    environment {
+        AWS_DEFAULT_REGION = "ap-south-1"
+        TF_DIR = "terraformProject/main"
+    }
 
     stages {
 
@@ -26,11 +30,8 @@ pipeline {
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-terraform-creds'
                 ]]) {
-                    dir('dev') {
-                        sh '''
-                            rm -rf .terraform
-                            terraform init
-                        '''
+                    dir("${TF_DIR}") {
+                        sh 'terraform init -reconfigure'
                     }
                 }
             }
@@ -45,7 +46,7 @@ pipeline {
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-terraform-creds'
                 ]]) {
-                    dir('dev') {
+                    dir("${TF_DIR}") {
                         sh 'terraform plan -out=tfplan'
                     }
                 }
@@ -60,13 +61,13 @@ pipeline {
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-terraform-creds'
                 ]]) {
-                    dir('terraformProject/main') {
+                    dir("${TF_DIR}") {
                         sh '''
-                            if [ "${ACTION}" = "apply" ]; then
-                                terraform apply -auto-approve tfplan
-                            else
-                                terraform destroy -auto-approve
-                            fi
+                        if [ "${ACTION}" = "apply" ]; then
+                            terraform apply -auto-approve tfplan
+                        else
+                            terraform destroy -auto-approve
+                        fi
                         '''
                     }
                 }
@@ -83,3 +84,4 @@ pipeline {
         }
     }
 }
+
