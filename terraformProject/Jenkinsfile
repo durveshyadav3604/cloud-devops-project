@@ -5,12 +5,18 @@ pipeline {
         choice(
             name: 'ACTION',
             choices: ['apply', 'destroy'],
-            description: 'Choose Terraform action'
+            description: 'Terraform action to perform'
         )
     }
 
     environment {
         AWS_DEFAULT_REGION = "ap-south-1"
+
+        // VERY IMPORTANT for CI/CD
+        AWS_SDK_LOAD_CONFIG = "0"
+        AWS_PROFILE = ""
+
+        // Terraform root directory
         TF_DIR = "terraformProject/main"
     }
 
@@ -34,11 +40,8 @@ pipeline {
                 ]) {
                     dir("${TF_DIR}") {
                         sh '''
-                          export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                          export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                          export AWS_DEFAULT_REGION=ap-south-1
-
-                          terraform init -reconfigure
+                            terraform version
+                            terraform init -reconfigure
                         '''
                     }
                 }
@@ -58,11 +61,7 @@ pipeline {
                 ]) {
                     dir("${TF_DIR}") {
                         sh '''
-                          export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                          export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                          export AWS_DEFAULT_REGION=ap-south-1
-
-                          terraform plan -out=tfplan
+                            terraform plan -out=tfplan
                         '''
                     }
                 }
@@ -81,15 +80,11 @@ pipeline {
                 ]) {
                     dir("${TF_DIR}") {
                         sh '''
-                          export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                          export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                          export AWS_DEFAULT_REGION=ap-south-1
-
-                          if [ "${ACTION}" = "apply" ]; then
-                              terraform apply -auto-approve tfplan
-                          else
-                              terraform destroy -auto-approve
-                          fi
+                            if [ "${ACTION}" = "apply" ]; then
+                                terraform apply -auto-approve tfplan
+                            else
+                                terraform destroy -auto-approve
+                            fi
                         '''
                     }
                 }
@@ -99,10 +94,10 @@ pipeline {
 
     post {
         success {
-            echo " Terraform ${params.ACTION} completed successfully"
+            echo "Terraform ${params.ACTION} completed successfully "
         }
         failure {
-            echo " Terraform ${params.ACTION} failed"
+            echo "Terraform ${params.ACTION} failed "
         }
     }
 }
