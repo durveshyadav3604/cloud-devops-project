@@ -60,7 +60,7 @@ pipeline {
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-terraform-creds'
                 ]]) {
-                    dir('terraformProject') {
+                    dir('terraformProject/main') {
                         sh '''
                             if [ "${ACTION}" = "apply" ]; then
                                 terraform apply -auto-approve tfplan
