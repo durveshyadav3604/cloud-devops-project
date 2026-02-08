@@ -10,8 +10,9 @@ pipeline {
     }
 
     environment {
+        AWS_REGION         = "ap-south-1"
         AWS_DEFAULT_REGION = "ap-south-1"
-        TF_DIR = "terraformProject/main"
+        TF_DIR             = "terraformProject/main"
     }
 
     stages {
@@ -26,12 +27,16 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                withCredentials([[
+                withCredentials([[ 
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-terraform-creds'
                 ]]) {
                     dir("${TF_DIR}") {
                         sh '''
+                          echo "🔐 Verifying AWS identity..."
+                          aws sts get-caller-identity
+
+                          echo "🚀 Initializing Terraform..."
                           rm -rf .terraform
                           terraform init -reconfigure
                         '''
@@ -45,7 +50,7 @@ pipeline {
                 expression { params.ACTION == 'apply' }
             }
             steps {
-                withCredentials([[
+                withCredentials([[ 
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-terraform-creds'
                 ]]) {
@@ -60,7 +65,7 @@ pipeline {
             steps {
                 input message: "Confirm Terraform ${params.ACTION}?"
 
-                withCredentials([[
+                withCredentials([[ 
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-terraform-creds'
                 ]]) {
@@ -80,10 +85,10 @@ pipeline {
 
     post {
         success {
-            echo "Terraform ${params.ACTION} completed successfully"
+            echo " Terraform ${params.ACTION} completed successfully"
         }
         failure {
-            echo "Terraform ${params.ACTION} failed"
+            echo " Terraform ${params.ACTION} failed"
         }
     }
 }
